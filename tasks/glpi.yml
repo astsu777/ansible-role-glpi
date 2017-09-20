@@ -1,0 +1,145 @@
+---
+- name: (GLPI) Install prerequisites
+  package:
+    name: "{{ item }}"
+    state: latest
+  with_items:
+    - php-gd
+    - php-mbstring
+    - php-curl
+    - php-ldap
+    - php-imap
+    - php-apcu-bc
+    - php-xmlrpc
+    - dnsutils
+  notify: restart nginx
+
+- name: (GLPI) Create the GLPI user
+  user:
+    name: "{{ glpi_user }}"
+    password: "{{ glpi_user_password }}"
+    shell: /bin/bash
+    update_password: on_create
+
+- name: (GLPI) Check if GLPI is already installed
+  stat:
+    path: /home/{{ glpi_user }}/public_html/glpi
+  register: glpiinstalled
+
+- name: (GLPI) Download the latest version and extract the archive to public_html
+  unarchive:
+    src: https://github.com/glpi-project/glpi/releases/download/9.1.6/glpi-9.1.6.tgz
+    remote_src: yes
+    dest: /home/{{ glpi_user }}/public_html/
+    owner: "{{ glpi_user }}"
+    group: "{{ glpi_user }}"
+  register: newglpi
+  when: not glpiinstalled.stat.exists
+
+- name: (GLPI) Create the database
+  mysql_db:
+    name: "{{ glpi_user }}_glpi"
+
+- name: (GLPI) Create the database's user
+  mysql_user:
+    name: "{{ glpi_user }}"
+    password: "{{ glpi_db_password }}"
+    update_password: on_create
+    state: present
+    priv: '{{ glpi_user }}\_%.*:ALL'
+
+- name: (GLPI) Create site in Nginx
+  template:
+    src: glpi-nginx.conf
+    dest: /etc/nginx/sites-available/{{ glpi_hostname }}.conf
+  when: not glpiinstalled.stat.exists
+
+- name: (GLPI) Create PHP pool configuration
+  template:
+    src: glpi-phppool.conf
+    dest: /etc/php/7.0/fpm/pool.d/{{ glpi_user }}.conf
+  when: not glpiinstalled.stat.exists
+  notify: restart php-fpm
+
+- name: (GLPI) Enable the site in Nginx
+  file:
+    src: /etc/nginx/sites-available/{{ glpi_hostname }}.conf
+    path: /etc/nginx/sites-enabled/{{ glpi_hostname }}.conf
+    state: link
+  when: not glpiinstalled.stat.exists
+  notify: reload nginx
+
+- name: (GLPI) Stop Nginx to generate certificate
+  service:
+    name: nginx
+    state: stopped
+  changed_when: false
+
+- name: (GLPI) Make sure Certbot is installed
+  package:
+    name: certbot
+    state: latest
+
+- name: (GLPI) Check if the hostname can be solved
+  command: dig {{ glpi_hostname }} +short
+  register: dig
+  changed_when: false
+
+- name: (GLPI) Generate certificate for GLPI
+  command: "certbot certonly -n -d {{ glpi_hostname }} --agree-tos --standalone --email {{ certbot_email }}"
+  register: certbot
+  when: not dig.stdout == ""
+
+- name: (GLPI) Check if Let's Encrypt certificates exist
+  stat:
+    path: /etc/letsencrypt/live/{{ glpi_hostname }}/fullchain.pem
+  register: cert
+
+- name: (GLPI) Copy default SSL certificates due to Certbot failure
+  copy:
+    src: ssl-cert-snakeoil.pem
+    dest: /etc/ssl/certs/ssl-cert-snakeoil.pem
+    owner: root
+    group: root
+    mode: 0644
+  when: not cert.stat.exists
+
+- name: (GLPI) Copy default SSL key due to Certbot failure
+  copy:
+    src: ssl-cert-snakeoil.key
+    dest: /etc/ssl/private/ssl-cert-snakeoil.key
+    owner: root
+    group: root
+    mode: 0644
+  when: not cert.stat.exists
+
+- name: (GLPI) Use default SSL certificate due to Certbot failure
+  lineinfile:
+    path: /etc/nginx/sites-available/{{ glpi_hostname }}.conf
+    regexp: '^    ssl_certificate '
+    line: "    ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;"
+    backrefs: yes
+  when: not cert.stat.exists
+
+- name: (GLPI) Use default SSL private key due to Certbot failure
+  lineinfile:
+    path: /etc/nginx/sites-available/{{ glpi_hostname }}.conf
+    regexp: '^    ssl_certificate_key'
+    line: "    ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;"
+    backrefs: yes
+  when: not cert.stat.exists
+
+- name: (GLPI) Start Nginx
+  service:
+    name: nginx
+    state: started
+  changed_when: false
+
+# Need to find a way to initialize the database to fully automate the setup
+#- name: (GLPI) Apply database configuration to the application
+#  template:
+#    src: glpi-config_db.php
+#    dest: /home/{{ glpi_user }}/public_html/glpi/config/config_db.php
+#    owner: "{{ glpi_user }}"
+#    group: "{{ glpi_user }}"
+#    mode: 0644

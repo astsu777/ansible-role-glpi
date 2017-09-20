@@ -1,0 +1,16 @@
+---
+# Default variables for this role
+
+# System user
+glpi_user: glpi
+glpi_user_password: MyPassword
+
+# Database credentials
+db_server: localhost
+glpi_db_password: MyPassword
+
+# Website configuration
+glpi_hostname: nextcloud.mysite.com
+
+# Let's Encrypt email address
+certbot_email: mymail@mail.com
