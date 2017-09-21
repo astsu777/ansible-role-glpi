@@ -15,6 +15,6 @@ glpi_hostname: nextcloud.mysite.com
 certbot_email: mymail@mail.com
 
 # Server configuration
-db_server: localhost
+db_server: "{{ inventory_hostname }}"
 glpi_server: localhost
 glpi_version: 9.1.6
