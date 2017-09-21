@@ -32,9 +32,12 @@ glpi_password: MyPassword
 glpi_db_password: MyPassword
 glpi_hostname: glpi.mysite.com
 certbot_email: mymail@mail.com
+db_server: localhost
+glpi_server: localhost
 ```
 
 The variables above can be configured as group_vars or host_vars. As far as the credentials are concerned, these should be kept in a separate secret vars_file encrypted with *ansible-vault*.
+
 
 Dependencies
 ------------

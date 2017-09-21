@@ -39,6 +39,7 @@
 - name: (GLPI) Create the database
   mysql_db:
     name: "{{ glpi_user }}_glpi"
+  delegate_to: "{{ db_server }}"
 
 - name: (GLPI) Create the database's user
   mysql_user:
@@ -47,6 +48,8 @@
     update_password: on_create
     state: present
     priv: '{{ glpi_user }}\_%.*:ALL'
+    host: "{{ glpi_server }}"
+  delegate_to: "{{ db_server }}"
 
 - name: (GLPI) Create site in Nginx
   template:
@@ -134,12 +137,3 @@
     name: nginx
     state: started
   changed_when: false
-
-# Need to find a way to initialize the database to fully automate the setup
-#- name: (GLPI) Apply database configuration to the application
-#  template:
-#    src: glpi-config_db.php
-#    dest: /home/{{ glpi_user }}/public_html/glpi/config/config_db.php
-#    owner: "{{ glpi_user }}"
-#    group: "{{ glpi_user }}"
-#    mode: 0644
