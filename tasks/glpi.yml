@@ -28,7 +28,7 @@
 
 - name: (GLPI) Download the latest version and extract the archive to public_html
   unarchive:
-    src: https://github.com/glpi-project/glpi/releases/download/9.1.6/glpi-9.1.6.tgz
+    src: https://github.com/glpi-project/glpi/releases/download/{{ glpi_version }}/glpi-{{ glpi_version }}.tgz
     remote_src: yes
     dest: /home/{{ glpi_user }}/public_html/
     owner: "{{ glpi_user }}"
