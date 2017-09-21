@@ -32,7 +32,7 @@ glpi_password: MyPassword
 glpi_db_password: MyPassword
 glpi_hostname: glpi.mysite.com
 certbot_email: mymail@mail.com
-db_server: localhost
+db_server: "{{ inventory_hostname }}" (this equals to *localhost*)
 glpi_server: localhost
 glpi_version: 9.1.6
 ```
